@@ -33,7 +33,7 @@ fun TeacherDashboard(
     val currentUser by authViewModel.currentUser.collectAsState()
     val authState by authViewModel.authState.collectAsState()
 
-    // 1. 启动时恢复用户会话（如果还没恢复）
+    // 1. Restore user session on launch (if not already restored)
     LaunchedEffect(Unit) {
         android.util.Log.d("TeacherDashboard", "Dashboard launched, currentUser: ${currentUser?.id}, authState: $authState")
         if (currentUser == null) {
@@ -44,32 +44,32 @@ fun TeacherDashboard(
         }
     }
 
-    // 2. 监听 currentUser 和 authState 的变化，加载数据
+    // 2. Listen for changes in currentUser and authState to load data
     LaunchedEffect(currentUser, authState) {
         android.util.Log.d("TeacherDashboard", "LaunchedEffect triggered - currentUser: ${currentUser?.id}, authState: $authState")
 
-        // 【修复】将 currentUser 赋值给一个本地变量以启用智能转换
+        // [FIX] Assign currentUser to a local variable to enable smart casting
         val localCurrentUser = currentUser
 
-        // 尝试从多个来源获取 userId
+        // Try to get userId from multiple sources
         val idToLoad: Int? = when {
-            // 优先级1: 从 currentUser 获取
+            // Priority 1: Get from currentUser
             localCurrentUser != null -> {
                 android.util.Log.d("TeacherDashboard", "Got userId from currentUser: ${localCurrentUser.id}")
                 localCurrentUser.id
             }
-            // 优先级2: 从 authState.Success 获取
+            // Priority 2: Get from authState.Success
             authState is com.tumme.scrudstudents.ui.auth.AuthState.Success -> {
                 val userId = (authState as com.tumme.scrudstudents.ui.auth.AuthState.Success).user.id
                 android.util.Log.d("TeacherDashboard", "Got userId from authState.Success: $userId")
                 userId
             }
-            // 优先级3: 从 savedStateHandle/SharedPreferences 获取（即使 restoreUser 还没完成）
+            // Priority 3: Get from savedStateHandle/SharedPreferences (even if restoreUser hasn't finished)
             else -> {
                 val savedId = authViewModel.getLastUserId()
                 android.util.Log.d("TeacherDashboard", "Got userId from savedState: $savedId")
                 if (savedId != null && localCurrentUser == null) {
-                    // 再次尝试恢复
+                    // Try to restore again
                     authViewModel.restoreUser()
                     kotlinx.coroutines.delay(200)
                 }
@@ -77,7 +77,7 @@ fun TeacherDashboard(
             }
         }
 
-        // 如果成功获取到ID，就调用 ViewModel 加载数据
+        // If an ID is successfully obtained, call the ViewModel to load data
         if (idToLoad != null) {
             android.util.Log.d("TeacherDashboard", "Loading data for userId: $idToLoad")
             viewModel.loadTeacherData(idToLoad)

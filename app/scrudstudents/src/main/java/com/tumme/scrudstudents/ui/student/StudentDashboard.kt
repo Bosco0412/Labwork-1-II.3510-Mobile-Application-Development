@@ -1,10 +1,10 @@
 package com.tumme.scrudstudents.ui.student
 
-import android.content.Context // +++ 新增
-import android.net.Uri // +++ 新增
-import androidx.activity.compose.rememberLauncherForActivityResult // +++ 新增
-import androidx.activity.result.contract.ActivityResultContracts // +++ 新增
-import androidx.compose.foundation.clickable // +++ 新增
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,11 +27,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext // +++ 新增
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
-import kotlinx.coroutines.launch // +++ 新增
-import java.io.File // +++ 新增
-import java.io.FileOutputStream // +++ 新增
+import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,23 +48,23 @@ fun StudentDashboard(
     val currentUser by authViewModel.currentUser.collectAsState()
     val authState by authViewModel.authState.collectAsState()
 
-    // --- (A. 新增：获取启动器、Context 和 CoroutineScope) ---
+    // --- Setup for Photo Picker ---
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val currentUserId = currentUser?.id // 获取当前用户ID
+    val currentUserId = currentUser?.id // Get current user ID
 
-    // 1. 创建一个启动器，它会启动相册选择器
+    // 1. Create a launcher to start the gallery picker
     val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(), // "给我一个内容"
+        contract = ActivityResultContracts.GetContent(),
         onResult = { uri: Uri? ->
-            // 3. 当用户选择一张照片后，会在这里收到 URI
+            // 3. When the user picks a photo, the URI is received here
             if (uri != null && currentUserId != null) {
-                // 我们必须复制这个文件，因为原始 URI 可能是临时的
+                // We must copy this file, as the original URI might be temporary
                 val filename = "user_${currentUserId}_profile.jpg"
                 val newPhotoPath = saveImageToInternalStorage(context, uri, filename)
 
                 if (newPhotoPath != null) {
-                    // 4. 更新 ViewModel
+                    // 4. Update the ViewModel
                     scope.launch {
                         authViewModel.updatePhotoUrl(currentUserId, newPhotoPath)
                     }
@@ -73,21 +73,21 @@ fun StudentDashboard(
             }
         }
     )
-    // --- (新增结束) ---
+    // --- End of Photo Picker Setup ---
 
-    // 2. 监听 currentUser 和 authState 的变化，加载数据
+    // Listen for changes in currentUser and authState to load data
     LaunchedEffect(currentUser, authState) {
         android.util.Log.d("StudentDashboard", "LaunchedEffect triggered - currentUser: ${currentUser?.id}, authState: $authState")
 
         val localCurrentUser = currentUser
 
         val idToLoad: Int? = when {
-            // 优先级1: 只有当 currentUser 明确存在时才加载数据
+            // Priority 1: Load data only if currentUser explicitly exists
             localCurrentUser != null -> {
                 android.util.Log.d("StudentDashboard", "Got userId from currentUser: ${localCurrentUser.id}")
                 localCurrentUser.id
             }
-            // 优先级2: 从 authState.Success 获取（如果它刚刚成功登录）
+            // Priority 2: Get from authState.Success (if just logged in)
             authState is com.tumme.scrudstudents.ui.auth.AuthState.Success -> {
                 val userId = (authState as com.tumme.scrudstudents.ui.auth.AuthState.Success).user.id
                 android.util.Log.d("StudentDashboard", "Got userId from authState.Success: $userId")
@@ -96,18 +96,17 @@ fun StudentDashboard(
             else -> null
         }
 
-        // 如果成功获取到ID，就调用 ViewModel 加载数据
+        // If an ID is successfully obtained, call the ViewModel to load data
         if (idToLoad != null) {
             android.util.Log.d("StudentDashboard", "Loading data for userId: $idToLoad")
             viewModel.loadStudentData(idToLoad)
         } else {
-            // 如果用户是 null，则清空仪表板数据
+            // If the user is null, clear the dashboard data
             viewModel.clearStudentData()
             android.util.Log.w("StudentDashboard", "No valid user found or session ended. Clearing data.")
         }
     }
 
-    // --- (以下是 UI 代码) ---
 
     Scaffold(
         topBar = {
@@ -142,7 +141,7 @@ fun StudentDashboard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // --- (修改 "Welcome Card") ---
+            // --- Welcome Card ---
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -150,35 +149,34 @@ fun StudentDashboard(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     )
                 ) {
-                    // 1. 将 Column 改为 Row，并设置垂直居中
+                    // Changed to a Row for side-by-side layout
                     Row(
                         modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically // 垂直居中
+                        verticalAlignment = Alignment.CenterVertically // Vertically center content
                     ) {
-                        // --- (B. 修改 AsyncImage 使其可点击) ---
+                        // --- Clickable Profile Image ---
                         AsyncImage(
                             model = studentInfo?.photoUrl ?: currentUser?.photoUrl,
                             contentDescription = "Profile Photo",
                             modifier = Modifier
                                 .size(64.dp)
                                 .clip(CircleShape)
-                                .clickable(enabled = currentUserId != null) { // <-- 设为可点击
-                                    // 2. 触发启动器
-                                    galleryLauncher.launch("image/*") // 只显示图片
+                                .clickable(enabled = currentUserId != null) { // Make clickable
+                                    // Trigger the gallery launcher
+                                    galleryLauncher.launch("image/*") // Show images only
                                 },
-                            contentScale = ContentScale.Crop, // 确保图片填充满圆形
+                            contentScale = ContentScale.Crop, // Ensure image fills the circle
                             placeholder = rememberVectorPainter(Icons.Default.Person),
                             error = rememberVectorPainter(Icons.Default.Person),
                             fallback = rememberVectorPainter(Icons.Default.Person)
                         )
-                        // --- (修改结束) ---
+                        // --- End of Image ---
 
-                        // 5. 在图片和文字之间添加间距
                         Spacer(modifier = Modifier.width(16.dp))
 
-                        // 6. 把原来的文字内容放进一个新的 Column 中
+                        // Column for text content
                         Column(
-                            modifier = Modifier.weight(1f) // 占据剩余空间
+                            modifier = Modifier.weight(1f) // Occupy remaining space
                         ) {
                             Text(
                                 text = "Welcome back!",
@@ -206,10 +204,10 @@ fun StudentDashboard(
                     }
                 }
             }
-            // --- (修改结束) ---
+            // --- End of Welcome Card ---
 
 
-            // +++ (恢复) Quick Actions +++
+            // --- Quick Actions ---
             item {
                 Text(
                     text = "Quick Actions",
@@ -277,10 +275,10 @@ fun StudentDashboard(
                     }
                 }
             }
-            // +++ (恢复结束) +++
+            // --- End of Quick Actions ---
 
 
-            // +++ (恢复) Enrolled Courses Summary +++
+            // --- Enrolled Courses Summary ---
             item {
                 Text(
                     text = "Enrolled Courses (${enrolledCourses.size})",
@@ -358,10 +356,10 @@ fun StudentDashboard(
                     }
                 }
             }
-            // +++ (恢复结束) +++
+            // --- End of Enrolled Courses ---
 
 
-            // +++ (恢复) Final Grade Card +++
+            // --- Final Grade Card ---
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -396,34 +394,34 @@ fun StudentDashboard(
                     }
                 }
             }
-            // +++ (恢复结束) +++
+            // --- End of Final Grade ---
         }
     }
 }
 
 
 /**
- * 这是一个辅助函数，将选定的图片从相册复制到 App 的私有存储
- * (作为文件中的一个私有顶层函数)
+ * Helper function to copy an image from a content URI (like the gallery)
+ * to the app's internal private storage.
  */
 private fun saveImageToInternalStorage(context: Context, uri: Uri, filename: String): String? {
     return try {
-        // 打开一个输入流来读取选定的图片
+        // Open an input stream to read the selected image
         val inputStream = context.contentResolver.openInputStream(uri)
 
-        // 创建一个新的目标文件，它位于 App 的私有 files 目录中
+        // Create a new destination file in the app's private files directory
         val file = File(context.filesDir, filename)
 
-        // 打开一个输出流来写入新文件
+        // Open an output stream to write the new file
         val outputStream = FileOutputStream(file)
 
-        // 复制数据
+        // Copy the data
         inputStream?.copyTo(outputStream)
 
         inputStream?.close()
         outputStream.close()
 
-        // 返回新文件的绝对路径 (Coil 可以加载这个路径)
+        // Return the new file's absolute path (Coil can load this path)
         file.absolutePath
 
     } catch (e: Exception) {
