@@ -31,7 +31,7 @@ fun StudentRow(
     ) {
         Text(text = student.dateOfBirth.let { dateFormat.format(it) }, modifier = Modifier.weight(0.25f))
         Text(text = "${student.lastName}", modifier = Modifier.weight(0.25f))
-        Text(text = "${student.firstName}", modifier = Modifier.weight(0.25f))
+
         Text(text = student.gender.value, modifier = Modifier.weight(0.15f))
         Row(modifier = Modifier.weight(0.10f), horizontalArrangement = Arrangement.SpaceEvenly) {
             IconButton(onClick = onView) { Icon(Icons.Default.Info, contentDescription="View") }

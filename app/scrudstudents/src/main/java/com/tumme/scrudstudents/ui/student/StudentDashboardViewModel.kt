@@ -4,24 +4,21 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tumme.scrudstudents.data.repository.SCRUDRepository
 import com.tumme.scrudstudents.data.repository.AuthRepository
-import com.tumme.scrudstudents.data.local.model.StudentUserEntity
-import com.tumme.scrudstudents.data.local.model.StudentEntity
-import com.tumme.scrudstudents.data.local.model.SubscribeEntity
-import com.tumme.scrudstudents.data.local.model.CourseEntity
-import com.tumme.scrudstudents.ui.auth.AuthViewModel
+// ... other imports
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+// 1. Add photoUrl to the StudentInfo data class
 data class StudentInfo(
     val firstName: String,
     val lastName: String,
-    val levelOfStudy: com.tumme.scrudstudents.data.local.model.LevelCourse
+    val levelOfStudy: com.tumme.scrudstudents.data.local.model.LevelCourse,
+    val photoUrl: String? // <-- ADDED THIS FIELD
 )
 
 data class EnrolledCourse(
@@ -66,7 +63,8 @@ class StudentDashboardViewModel @Inject constructor(
                     _studentInfo.value = StudentInfo(
                         firstName = user.firstName,
                         lastName = user.lastName,
-                        levelOfStudy = com.tumme.scrudstudents.data.local.model.LevelCourse.P1
+                        levelOfStudy = com.tumme.scrudstudents.data.local.model.LevelCourse.P1,
+                        photoUrl = user.photoUrl // <-- 2. Pass photoUrl from user
                     )
                     return@launch
                 }
@@ -75,7 +73,8 @@ class StudentDashboardViewModel @Inject constructor(
                 _studentInfo.value = StudentInfo(
                     firstName = user.firstName,
                     lastName = user.lastName,
-                    levelOfStudy = studentUser.levelOfStudy
+                    levelOfStudy = studentUser.levelOfStudy,
+                    photoUrl = user.photoUrl // <-- 3. Pass photoUrl from user
                 )
 
                 // Load enrolled courses with grades
@@ -130,7 +129,6 @@ class StudentDashboardViewModel @Inject constructor(
         }
     }
 
-    // [NEW] Function to clear all dashboard data when the user logs out.
     fun clearStudentData() {
         _studentInfo.value = null
         _enrolledCourses.value = emptyList()

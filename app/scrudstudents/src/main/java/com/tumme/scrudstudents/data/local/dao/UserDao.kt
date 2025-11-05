@@ -30,4 +30,7 @@ interface UserDao {
 
     @Query("SELECT COUNT(*) FROM users WHERE username = :username")
     suspend fun checkUsernameExists(username: String): Int
+
+    @Query("UPDATE users SET photoUrl = :newPhotoUrl WHERE id = :userId")
+    suspend fun updateUserPhoto(userId: Int, newPhotoUrl: String)
 }

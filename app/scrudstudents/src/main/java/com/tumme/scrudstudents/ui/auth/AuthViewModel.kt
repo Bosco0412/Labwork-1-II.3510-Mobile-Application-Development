@@ -16,7 +16,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 sealed class AuthState {
     object Idle : AuthState()
     object Loading : AuthState()
@@ -41,7 +42,8 @@ class AuthViewModel @Inject constructor(
     private val LAST_USER_ID_KEY = "last_user_id"
 
     // Use SharedPreferences for persistence across ViewModel instances
-    private val prefs: SharedPreferences = context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences("auth_prefs", Context.MODE_PRIVATE)
 
     // [FIX 1] Simplify getters to rely ONLY on SharedPreferences for cross-session persistence.
     // This prevents the restore loop if SavedStateHandle fails to clear or restores an old value.
@@ -72,7 +74,10 @@ class AuthViewModel @Inject constructor(
                     savedStateHandle[LAST_USERNAME_KEY] = username
                     savedStateHandle[LAST_USER_ID_KEY] = user.id
 
-                    android.util.Log.d("AuthViewModel", "Saved userId to SharedPreferences: ${user.id}")
+                    android.util.Log.d(
+                        "AuthViewModel",
+                        "Saved userId to SharedPreferences: ${user.id}"
+                    )
                     _authState.value = AuthState.Success(user)
                 } else {
                     _authState.value = AuthState.Error("Invalid username or password")
@@ -92,7 +97,8 @@ class AuthViewModel @Inject constructor(
         role: UserRole,
         levelOfStudy: LevelCourse? = null,
         department: String? = null,
-        specialization: String? = null
+        specialization: String? = null,
+        photoUrl: String? = null
     ) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
@@ -106,7 +112,8 @@ class AuthViewModel @Inject constructor(
                     role = role,
                     levelOfStudy = levelOfStudy,
                     department = department,
-                    specialization = specialization
+                    specialization = specialization,
+                    photoUrl = photoUrl
                 )
                 result.fold(
                     onSuccess = { user ->
@@ -120,7 +127,10 @@ class AuthViewModel @Inject constructor(
                         savedStateHandle[LAST_USERNAME_KEY] = username
                         savedStateHandle[LAST_USER_ID_KEY] = user.id
 
-                        android.util.Log.d("AuthViewModel", "Saved userId to SharedPreferences after registration: ${user.id}")
+                        android.util.Log.d(
+                            "AuthViewModel",
+                            "Saved userId to SharedPreferences after registration: ${user.id}"
+                        )
                         _authState.value = AuthState.Success(user)
                     },
                     onFailure = { error ->
@@ -152,7 +162,10 @@ class AuthViewModel @Inject constructor(
 
     fun restoreUser() {
         viewModelScope.launch {
-            android.util.Log.d("AuthViewModel", "restoreUser called - currentUser: ${_currentUser.value?.id}, savedUserId: $lastLoggedInUserId, savedUsername: $lastLoggedInUsername")
+            android.util.Log.d(
+                "AuthViewModel",
+                "restoreUser called - currentUser: ${_currentUser.value?.id}, savedUserId: $lastLoggedInUserId, savedUsername: $lastLoggedInUsername"
+            )
 
             // First try to restore by user ID (faster) - Uses the simplified getter which checks SharedPreferences only
             val userId = lastLoggedInUserId
@@ -160,7 +173,10 @@ class AuthViewModel @Inject constructor(
                 android.util.Log.d("AuthViewModel", "Trying to restore by userId: $userId")
                 val user = authRepository.getUserById(userId)
                 if (user != null) {
-                    android.util.Log.d("AuthViewModel", "Restored user by userId: ${user.id}, name: ${user.firstName} ${user.lastName}")
+                    android.util.Log.d(
+                        "AuthViewModel",
+                        "Restored user by userId: ${user.id}, name: ${user.firstName} ${user.lastName}"
+                    )
                     _currentUser.value = user
                     // Ensure SavedStateHandle is updated if restored from preferences
                     savedStateHandle[LAST_USER_ID_KEY] = user.id
@@ -177,7 +193,10 @@ class AuthViewModel @Inject constructor(
                 android.util.Log.d("AuthViewModel", "Trying to restore by username: $username")
                 val user = authRepository.getUserByUsername(username)
                 if (user != null) {
-                    android.util.Log.d("AuthViewModel", "Restored user by username: ${user.id}, name: ${user.firstName} ${user.lastName}")
+                    android.util.Log.d(
+                        "AuthViewModel",
+                        "Restored user by username: ${user.id}, name: ${user.firstName} ${user.lastName}"
+                    )
                     _currentUser.value = user
 
                     // Update SharedPreferences (using asynchronous apply for efficiency)
@@ -198,5 +217,25 @@ class AuthViewModel @Inject constructor(
 
     fun getSavedUsername(): String? {
         return lastLoggedInUsername
+    }
+    fun updatePhotoUrl(userId: Int, newPhotoPath: String) {
+        viewModelScope.launch {
+            try {
+                // 1. 在后台线程 (IO) 更新数据库
+                withContext(Dispatchers.IO) {
+                    authRepository.updateUserPhoto(userId, newPhotoPath)
+                }
+
+                // 2. 在主线程 (Main) 更新 StateFlow
+                // 这会立刻触发 UI (AsyncImage) 刷新
+                _currentUser.value = _currentUser.value?.copy(photoUrl = newPhotoPath)
+
+                android.util.Log.d("AuthViewModel", "Photo URL updated in DB and StateFlow")
+
+            } catch (e: Exception) {
+                android.util.Log.e("AuthViewModel", "Failed to update photo URL", e)
+                // 可选：在这里设置一个错误状态，以便 UI 显示一个 Toast
+            }
+        }
     }
 }

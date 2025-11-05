@@ -2,6 +2,8 @@ package com.tumme.scrudstudents.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.RoomDatabase // <-- 1. ADD IMPORT
+import androidx.sqlite.db.SupportSQLiteDatabase // <-- 2. ADD IMPORT
 import com.tumme.scrudstudents.data.local.AppDatabase
 import com.tumme.scrudstudents.data.local.dao.CourseDao
 import com.tumme.scrudstudents.data.local.dao.StudentDao
@@ -18,58 +20,52 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 import dagger.hilt.android.qualifiers.ApplicationContext
-/**
- * Hilt Module for providing application-level dependencies.
- * This object contains instructions for Hilt on how to create instances of various classes
- * that are needed throughout the application, such as the database, DAOs, and the repository.
- *
- * @Module annotation marks this object as a Hilt module.
- * @InstallIn(SingletonComponent::class) specifies that the dependencies provided here will have an
- * application-wide scope, meaning they are created once and shared across the entire app.
- */
+import kotlinx.coroutines.CoroutineScope // <-- 3. ADD IMPORT
+import kotlinx.coroutines.Dispatchers // <-- 4. ADD IMPORT
+import kotlinx.coroutines.launch // <-- 5. ADD IMPORT
+import javax.inject.Provider // <-- 6. ADD IMPORT (VERY IMPORTANT)
+
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
-    /**
-     * Provides a singleton instance of the Room database (AppDatabase).
-     * @Provides annotation tells Hilt that this function provides a dependency.
-     * @Singleton ensures that only one instance of the database is ever created.
-     *
-     * @param context The application context, automatically injected by Hilt using the @ApplicationContext qualifier.
-     * @return The singleton AppDatabase instance.
-     */
+
     @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, "scrud-db")
-            .fallbackToDestructiveMigration()
-            .build()
+    fun provideDatabase(
+        @ApplicationContext context: Context,
+        // 7. Use Provider<> to lazily inject the seeder
+        // This breaks the circular dependency loop (DB -> Seeder -> DAOs -> DB)
+        seederProvider: Provider<SampleDataSeeder>
+    ): AppDatabase {
 
-    /**
-     * Provides an instance of StudentDao.
-     * Hilt knows how to provide the `db: AppDatabase` parameter because of the `provideDatabase` function above.
-     */
+        // 8. Create a Room callback
+        val dbCallback = object : RoomDatabase.Callback() {
+            override fun onCreate(db: SupportSQLiteDatabase) {
+                super.onCreate(db)
+                // 9. Run the seeder in a background IO thread
+                CoroutineScope(Dispatchers.IO).launch {
+                    val seeder = seederProvider.get()
+                    seeder.seedData() // This now runs in the background
+                }
+            }
+        }
+
+        // 10. Build the database and add the callback
+        return Room.databaseBuilder(context, AppDatabase::class.java, "scrud-db")
+            .fallbackToDestructiveMigration()
+            .addCallback(dbCallback) // <-- 11. ATTACH THE CALLBACK
+            .build()
+    }
+
+    // --- ALL OTHER PROVIDERS BELOW REMAIN EXACTLY THE SAME ---
+
     @Provides fun provideStudentDao(db: AppDatabase): StudentDao = db.studentDao()
-    // Provides an instance of CourseDao.
     @Provides fun provideCourseDao(db: AppDatabase): CourseDao = db.courseDao()
-    // Provides an instance of SubscribeDao.
     @Provides fun provideSubscribeDao(db: AppDatabase): SubscribeDao = db.subscribeDao()
-    // Provides an instance of UserDao.
     @Provides fun provideUserDao(db: AppDatabase): UserDao = db.userDao()
-    // Provides an instance of TeacherDao.
     @Provides fun provideTeacherDao(db: AppDatabase): TeacherDao = db.teacherDao()
-    // Provides an instance of StudentUserDao.
     @Provides fun provideStudentUserDao(db: AppDatabase): StudentUserDao = db.studentUserDao()
 
-    /**
-     * Provides a singleton instance of the SCRUDRepository.
-     * This function demonstrates the power of dependency injection:
-     * Hilt sees that this function needs StudentDao, CourseDao, and SubscribeDao.
-     * It then automatically calls the provider functions above to get instances of those DAOs
-     * and passes them as arguments to create the SCRUDRepository.
-     *
-     * @return The singleton SCRUDRepository instance.
-     */
     @Provides
     @Singleton
     fun provideRepository(studentDao: StudentDao, courseDao: CourseDao,

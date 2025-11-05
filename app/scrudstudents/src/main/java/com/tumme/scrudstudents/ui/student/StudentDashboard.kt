@@ -1,5 +1,10 @@
 package com.tumme.scrudstudents.ui.student
 
+import android.content.Context // +++ 新增
+import android.net.Uri // +++ 新增
+import androidx.activity.compose.rememberLauncherForActivityResult // +++ 新增
+import androidx.activity.result.contract.ActivityResultContracts // +++ 新增
+import androidx.compose.foundation.clickable // +++ 新增
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +23,16 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.tumme.scrudstudents.data.local.model.LevelCourse
 import com.tumme.scrudstudents.ui.auth.AuthViewModel
 
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext // +++ 新增
+import coil.compose.AsyncImage
+import kotlinx.coroutines.launch // +++ 新增
+import java.io.File // +++ 新增
+import java.io.FileOutputStream // +++ 新增
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudentDashboard(
@@ -32,6 +47,33 @@ fun StudentDashboard(
     val finalGrade by viewModel.finalGrade.collectAsState()
     val currentUser by authViewModel.currentUser.collectAsState()
     val authState by authViewModel.authState.collectAsState()
+
+    // --- (A. 新增：获取启动器、Context 和 CoroutineScope) ---
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val currentUserId = currentUser?.id // 获取当前用户ID
+
+    // 1. 创建一个启动器，它会启动相册选择器
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(), // "给我一个内容"
+        onResult = { uri: Uri? ->
+            // 3. 当用户选择一张照片后，会在这里收到 URI
+            if (uri != null && currentUserId != null) {
+                // 我们必须复制这个文件，因为原始 URI 可能是临时的
+                val filename = "user_${currentUserId}_profile.jpg"
+                val newPhotoPath = saveImageToInternalStorage(context, uri, filename)
+
+                if (newPhotoPath != null) {
+                    // 4. 更新 ViewModel
+                    scope.launch {
+                        authViewModel.updatePhotoUrl(currentUserId, newPhotoPath)
+                    }
+                    android.util.Log.d("PhotoUploader", "New photo saved to: $newPhotoPath")
+                }
+            }
+        }
+    )
+    // --- (新增结束) ---
 
     // 2. 监听 currentUser 和 authState 的变化，加载数据
     LaunchedEffect(currentUser, authState) {
@@ -100,7 +142,7 @@ fun StudentDashboard(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Welcome Card
+            // --- (修改 "Welcome Card") ---
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -108,36 +150,66 @@ fun StudentDashboard(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     )
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
+                    // 1. 将 Column 改为 Row，并设置垂直居中
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically // 垂直居中
                     ) {
-                        Text(
-                            text = "Welcome back!",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        // --- (B. 修改 AsyncImage 使其可点击) ---
+                        AsyncImage(
+                            model = studentInfo?.photoUrl ?: currentUser?.photoUrl,
+                            contentDescription = "Profile Photo",
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .clickable(enabled = currentUserId != null) { // <-- 设为可点击
+                                    // 2. 触发启动器
+                                    galleryLauncher.launch("image/*") // 只显示图片
+                                },
+                            contentScale = ContentScale.Crop, // 确保图片填充满圆形
+                            placeholder = rememberVectorPainter(Icons.Default.Person),
+                            error = rememberVectorPainter(Icons.Default.Person),
+                            fallback = rememberVectorPainter(Icons.Default.Person)
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        // Display name from currentUser if studentInfo is not loaded yet
-                        val userName = studentInfo?.let { "${it.firstName} ${it.lastName}" }
-                            ?: currentUser?.let { "${it.firstName} ${it.lastName}" }
-                            ?: "Loading..."
-                        Text(
-                            text = "Name: $userName",
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        val levelText = studentInfo?.levelOfStudy?.value ?: "Loading..."
-                        Text(
-                            text = "Level: $levelText",
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        // --- (修改结束) ---
+
+                        // 5. 在图片和文字之间添加间距
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        // 6. 把原来的文字内容放进一个新的 Column 中
+                        Column(
+                            modifier = Modifier.weight(1f) // 占据剩余空间
+                        ) {
+                            Text(
+                                text = "Welcome back!",
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            val userName = studentInfo?.let { "${it.firstName} ${it.lastName}" }
+                                ?: currentUser?.let { "${it.firstName} ${it.lastName}" }
+                                ?: "Loading..."
+                            Text(
+                                text = "Name: $userName",
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            val levelText = studentInfo?.levelOfStudy?.value ?: "Loading..."
+                            Text(
+                                text = "Level: $levelText",
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
                     }
                 }
             }
+            // --- (修改结束) ---
 
-            // Quick Actions
+
+            // +++ (恢复) Quick Actions +++
             item {
                 Text(
                     text = "Quick Actions",
@@ -205,8 +277,10 @@ fun StudentDashboard(
                     }
                 }
             }
+            // +++ (恢复结束) +++
 
-            // Enrolled Courses Summary
+
+            // +++ (恢复) Enrolled Courses Summary +++
             item {
                 Text(
                     text = "Enrolled Courses (${enrolledCourses.size})",
@@ -278,20 +352,20 @@ fun StudentDashboard(
                                 text = "${course.score}",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
-                                // CHANGED: Grade threshold from 4.0 to 10.0 (for 0-20 scale)
                                 color = if (course.score >= 10.0) Color.Green else Color.Red
                             )
                         }
                     }
                 }
             }
+            // +++ (恢复结束) +++
 
-            // Final Grade Card
+
+            // +++ (恢复) Final Grade Card +++
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        // CHANGED: Grade threshold from 4.0 to 10.0 (for 0-20 scale)
                         containerColor = if (finalGrade >= 10.0)
                             Color(0xFFE8F5E8) else Color(0xFFFFEBEE)
                     )
@@ -311,20 +385,49 @@ fun StudentDashboard(
                             text = String.format("%.2f", finalGrade),
                             fontSize = 32.sp,
                             fontWeight = FontWeight.Bold,
-                            // CHANGED: Grade threshold from 4.0 to 10.0 (for 0-20 scale)
                             color = if (finalGrade >= 10.0) Color.Green else Color.Red
                         )
                         Text(
-                            // CHANGED: Grade threshold from 4.0 to 10.0 (for 0-20 scale)
                             text = if (finalGrade >= 10.0) "PASS" else "FAIL",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium,
-                            // CHANGED: Grade threshold from 4.0 to 10.0 (for 0-20 scale)
                             color = if (finalGrade >= 10.0) Color.Green else Color.Red
                         )
                     }
                 }
             }
+            // +++ (恢复结束) +++
         }
+    }
+}
+
+
+/**
+ * 这是一个辅助函数，将选定的图片从相册复制到 App 的私有存储
+ * (作为文件中的一个私有顶层函数)
+ */
+private fun saveImageToInternalStorage(context: Context, uri: Uri, filename: String): String? {
+    return try {
+        // 打开一个输入流来读取选定的图片
+        val inputStream = context.contentResolver.openInputStream(uri)
+
+        // 创建一个新的目标文件，它位于 App 的私有 files 目录中
+        val file = File(context.filesDir, filename)
+
+        // 打开一个输出流来写入新文件
+        val outputStream = FileOutputStream(file)
+
+        // 复制数据
+        inputStream?.copyTo(outputStream)
+
+        inputStream?.close()
+        outputStream.close()
+
+        // 返回新文件的绝对路径 (Coil 可以加载这个路径)
+        file.absolutePath
+
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
     }
 }

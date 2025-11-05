@@ -35,7 +35,8 @@ class AuthRepository @Inject constructor(
         role: UserRole,
         levelOfStudy: LevelCourse? = null,
         department: String? = null,
-        specialization: String? = null
+        specialization: String? = null,
+        photoUrl: String? = null // <-- 1. ADDED PARAMETER
     ): Result<UserEntity> {
         return try {
             // Check if username already exists
@@ -53,7 +54,8 @@ class AuthRepository @Inject constructor(
                 role = role,
                 email = email,
                 firstName = firstName,
-                lastName = lastName
+                lastName = lastName,
+                photoUrl = photoUrl // <-- 2. PASSED PARAMETER TO ENTITY
             )
 
             userDao.insert(user)
@@ -79,7 +81,7 @@ class AuthRepository @Inject constructor(
                         lastName = lastName,
                         firstName = firstName,
                         dateOfBirth = Date(), // Default to current date
-                        gender = Gender.NotConcerned // Assuming Gender.OTHER exists
+                        gender = Gender.NotConcerned // Assuming Gender.NotConcerned exists
                     )
                     studentDao.insert(student)
                     android.util.Log.d("AuthRepository", "Inserted StudentEntity with idStudent: $studentId")
@@ -146,5 +148,13 @@ class AuthRepository @Inject constructor(
     suspend fun getStudentUserByStudentId(studentId: Int): StudentUserEntity? {
         return studentUserDao.getStudentUserByStudentId(studentId)
     }
-}
 
+    suspend fun updateUserPhoto(userId: Int, newPhotoUrl: String) {
+        try {
+            userDao.updateUserPhoto(userId, newPhotoUrl)
+            android.util.Log.d("AuthRepository", "Successfully updated photoUrl for user $userId")
+        } catch (e: Exception) {
+            android.util.Log.e("AuthRepository", "Error updating photoUrl", e)
+        }
+    }
+}

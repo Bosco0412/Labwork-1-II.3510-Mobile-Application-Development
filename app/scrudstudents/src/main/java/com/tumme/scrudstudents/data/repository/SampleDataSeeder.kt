@@ -30,7 +30,8 @@ class SampleDataSeeder @Inject constructor(
                 role = UserRole.STUDENT,
                 email = "student1@university.edu",
                 firstName = "Alice",
-                lastName = "Johnson"
+                lastName = "Johnson",
+                photoUrl = null
             )
 
             val student2 = UserEntity(
@@ -40,7 +41,8 @@ class SampleDataSeeder @Inject constructor(
                 role = UserRole.STUDENT,
                 email = "student2@university.edu",
                 firstName = "Bob",
-                lastName = "Smith"
+                lastName = "Smith",
+                photoUrl = null
             )
 
             val teacher1 = UserEntity(
@@ -50,7 +52,8 @@ class SampleDataSeeder @Inject constructor(
                 role = UserRole.TEACHER,
                 email = "teacher1@university.edu",
                 firstName = "Dr. Sarah",
-                lastName = "Wilson"
+                lastName = "Wilson",
+                photoUrl = null
             )
 
             val teacher2 = UserEntity(
@@ -60,7 +63,8 @@ class SampleDataSeeder @Inject constructor(
                 role = UserRole.TEACHER,
                 email = "teacher2@university.edu",
                 firstName = "Prof. Michael",
-                lastName = "Brown"
+                lastName = "Brown",
+                photoUrl = null
             )
 
             userDao.insert(student1)

@@ -87,5 +87,5 @@ dependencies {
 
     // Material Icons (optional for your buttons)
     implementation("androidx.compose.material:material-icons-extended:1.7.4")
-
+    implementation(libs.coil.compose)
 }

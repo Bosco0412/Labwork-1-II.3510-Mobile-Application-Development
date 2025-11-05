@@ -23,7 +23,7 @@ import com.tumme.scrudstudents.data.local.model.StudentUserEntity
     UserEntity::class,
     TeacherEntity::class,
     StudentUserEntity::class
-], version = 2, exportSchema = false)
+], version = 3, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun studentDao(): StudentDao

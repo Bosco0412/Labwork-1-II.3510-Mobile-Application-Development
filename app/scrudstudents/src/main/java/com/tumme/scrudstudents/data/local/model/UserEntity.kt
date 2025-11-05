@@ -11,7 +11,8 @@ data class UserEntity(
     val role: UserRole,
     val email: String,
     val firstName: String,
-    val lastName: String
+    val lastName: String,
+    val photoUrl: String?
 )
 
 enum class UserRole {
